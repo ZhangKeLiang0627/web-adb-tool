@@ -1,0 +1,239 @@
+/* =============================================================================
+ * 组件样式（components）—— 按钮 / 状态 / 输入框 / 终端 / 进度条
+ * 换设计 = 改这里的具体视觉，颜色一律引用 themes.css 的变量
+ * ========================================================================== */
+
+/* ---------- 按钮 ---------- */
+.btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* ---------- 徽标 ---------- */
+.badge {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+.badge-version {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ---------- 连接状态 ---------- */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.status-connected .dot {
+  background: var(--success);
+}
+.status-connected .status-text {
+  color: var(--success);
+}
+.status-error .dot {
+  background: var(--danger);
+}
+.status-error .status-text {
+  color: var(--danger);
+}
+
+/* ---------- 提示 / 日志 ---------- */
+.hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: var(--space-2) 0;
+}
+
+/* ---------- 输入框 ---------- */
+.input {
+  width: 100%;
+  font: inherit;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.input:disabled {
+  opacity: 0.5;
+}
+
+/* ---------- 连接区 / 设备信息 ---------- */
+.connect-body,
+.files-body {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+}
+
+.device-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.device-info .info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 13px;
+}
+.device-info .info-key {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.device-info .info-val {
+  color: var(--text-primary);
+  text-align: right;
+  word-break: break-all;
+}
+
+/* ---------- Shell 终端 ---------- */
+.panel-shell {
+  flex: 1;
+}
+.shell-output {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-code);
+  color: var(--text-code);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: var(--space-3);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.shell-output .prompt {
+  color: var(--accent);
+}
+.shell-output .cmd {
+  color: var(--text-code);
+}
+.shell-output .err {
+  color: var(--danger);
+}
+.shell-input-row {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.shell-input {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+.shell-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.shell-input:disabled {
+  opacity: 0.5;
+}
+
+/* ---------- 文件操作 ---------- */
+.file-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.file-row label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.file-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.progress {
+  height: 8px;
+  background: var(--bg-subtle);
+  border-radius: 999px;
+  overflow: hidden;
+  visibility: hidden;
+}
+.progress.visible {
+  visibility: visible;
+}
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.file-log {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-height: 1.4em;
+  word-break: break-all;
+}
+.file-log.ok {
+  color: var(--success);
+}
+.file-log.err {
+  color: var(--danger);
+}

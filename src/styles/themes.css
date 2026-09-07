@@ -1,0 +1,101 @@
+/* =============================================================================
+ * 设计 Token（Design Tokens）—— 换肤 / 换色只改这个文件
+ * -----------------------------------------------------------------------------
+ * 约定：
+ *   1. 组件与布局一律引用下面的语义变量，禁止在组件样式里写死颜色。
+ *   2. 新增一套皮肤 = 新增一个 [data-theme="xxx"] 块，覆盖需要改的变量。
+ *   3. 换肤入口在 <html data-theme="...">，由 main.ts 里的主题切换控制。
+ * ========================================================================== */
+
+/* 默认主题（light） */
+:root,
+[data-theme="light"] {
+  /* 背景 */
+  --bg-app: #f5f6f8;
+  --bg-panel: #ffffff;
+  --bg-subtle: #eef0f3;
+  --bg-input: #ffffff;
+  --bg-hover: #f0f3f7;
+  --bg-code: #0d1117;
+
+  /* 文字 */
+  --text-primary: #1f2328;
+  --text-secondary: #57606a;
+  --text-muted: #8b949e;
+  --text-on-accent: #ffffff;
+  --text-code: #e6edf3;
+
+  /* 语义色 */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #dbeafe;
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --info: #0891b2;
+  --info-soft: #cffafe;
+
+  /* 边框 */
+  --border: #d0d7de;
+  --border-strong: #9aa4af;
+
+  /* 排版 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* 间距 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 暗色主题 */
+[data-theme="dark"] {
+  --bg-app: #0d1117;
+  --bg-panel: #161b22;
+  --bg-subtle: #21262d;
+  --bg-input: #0d1117;
+  --bg-hover: #1f242c;
+  --bg-code: #010409;
+
+  --text-primary: #e6edf3;
+  --text-secondary: #aab4bf;
+  --text-muted: #7d8590;
+  --text-on-accent: #ffffff;
+  --text-code: #e6edf3;
+
+  --accent: #58a6ff;
+  --accent-hover: #79b8ff;
+  --accent-soft: #1f3a5f;
+  --success: #3fb950;
+  --success-soft: #12261a;
+  --warning: #d29922;
+  --warning-soft: #2a2111;
+  --danger: #f85149;
+  --danger-soft: #2d1413;
+  --info: #39c5cf;
+  --info-soft: #0e2a2d;
+
+  --border: #30363d;
+  --border-strong: #484f58;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+}

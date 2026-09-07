@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>web-adb-tool</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-name">web-adb-tool</span>
+          <span class="badge badge-version">v0.1.0</span>
+        </div>
+        <div class="header-actions">
+          <div id="conn-status" class="status">
+            <span class="dot"></span><span class="status-text">未连接</span>
+          </div>
+          <button id="theme-toggle" class="btn btn-ghost" type="button">深色</button>
+        </div>
+      </header>
+
+      <main class="app-main">
+        <aside class="panel panel-connect">
+          <h2 class="panel-title">连接</h2>
+          <div class="connect-body">
+            <button id="btn-connect" class="btn btn-primary" type="button">连接设备</button>
+            <p class="hint" id="hint-browser">仅支持 Chrome / Edge 等 Chromium 内核浏览器</p>
+            <div id="device-info" class="device-info"></div>
+          </div>
+        </aside>
+
+        <section class="panel panel-shell">
+          <h2 class="panel-title">Shell</h2>
+          <div id="shell-output" class="shell-output" aria-live="polite"></div>
+          <form id="shell-form" class="shell-input-row">
+            <input
+              id="shell-input"
+              class="shell-input"
+              type="text"
+              placeholder="输入命令，回车执行，例如：ls -la"
+              autocomplete="off"
+              spellcheck="false"
+              disabled
+            />
+            <button type="submit" class="btn btn-primary" disabled>执行</button>
+          </form>
+        </section>
+
+        <section class="panel panel-files">
+          <h2 class="panel-title">文件传输</h2>
+          <div class="files-body">
+            <div class="file-row">
+              <label for="file-remote">远程路径</label>
+              <input
+                id="file-remote"
+                class="input"
+                type="text"
+                placeholder="/data/local/tmp/foo"
+                disabled
+              />
+            </div>
+            <div class="file-actions">
+              <button id="btn-upload" class="btn" type="button" disabled>上传 (push)</button>
+              <button id="btn-download" class="btn" type="button" disabled>下载 (pull)</button>
+            </div>
+            <input id="file-input" type="file" hidden />
+            <div id="file-progress" class="progress"><div class="progress-bar"></div></div>
+            <div id="file-log" class="file-log"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

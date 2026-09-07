@@ -1,0 +1,22 @@
+{
+  "name": "web-adb-tool",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Web-based ADB tool (WebUSB) for Allwinner/Rockchip Linux boards",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@yume-chan/adb": "^2.6.4",
+    "@yume-chan/adb-credential-web": "^2.1.0",
+    "@yume-chan/adb-daemon-webusb": "^2.3.2"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

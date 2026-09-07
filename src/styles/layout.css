@@ -1,0 +1,75 @@
+/* =============================================================================
+ * 布局（layout）—— 换布局 / 换分区排列只改这个文件
+ * -----------------------------------------------------------------------------
+ * 当前布局：header 顶栏 + 三栏（连接 / Shell / 文件）
+ * 换布局 = 改 .app-main 的 grid-template-columns / 区域排列，DOM 结构不动。
+ * ========================================================================== */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 var(--space-5);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.brand-name {
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.app-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 300px;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  overflow: hidden;
+}
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-title {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* 窄屏（<900px）改为上下堆叠，便于移动端 / 小窗 */
+@media (max-width: 900px) {
+  .app-main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(240px, 1fr) auto;
+    overflow: auto;
+  }
+  .panel-shell {
+    min-height: 300px;
+  }
+}
