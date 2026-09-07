@@ -39,7 +39,7 @@ npm run build   # 产物输出到 dist/
 
 ## 部署
 
-`deploy` 分支 push 后由 GitHub Actions 自动构建并部署到 GitHub Pages：
+`main` 分支 push 后由 GitHub Actions 自动构建并部署到 GitHub Pages：
 
 ```
 https://<账号>.github.io/web-adb-tool/

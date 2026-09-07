@@ -39,7 +39,7 @@ npm run build   # output goes to dist/
 
 ## Deployment
 
-Pushing the `deploy` branch triggers GitHub Actions to build and publish to GitHub Pages:
+Pushing to the `main` branch triggers GitHub Actions to build and publish to GitHub Pages:
 
 ```
 https://<your-account>.github.io/web-adb-tool/
