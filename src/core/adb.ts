@@ -419,20 +419,19 @@ async function pumpThenExit(
 const ESC = '\x1b';
 
 /**
- * bash 专属初始化：bash 完整支持 PS1 转义（\u \h \w \$）与 tab 补全。
- * 颜色用真实 ESC 字节注入，`\u@\h:\w\$` 由 bash 展开为 用户名@主机名:路径# 。
- * 关键：ANSI 颜色序列必须用 bash 的 `\[` `\]`（字面反斜杠+方括号）包裹成"非打印区"，
- * 否则 readline 会把转义序列算进提示符可见宽度，导致光标错位、输入字符叠到提示符上
- * （典型表现：敲一个字就变成 `mroot@p200:m/m#` 这种乱相）。`\[`→0x01、`\]`→0x02 标记。
+ * bash 专属初始化。
+ * 历史教训（v0.2.4/v0.2.5 连续翻车）：bash 场景**不要注入自定义 PS1，也不要碰 stty**：
+ * ① bash 自带 readline，行编辑/回显由它全权管理；手动 `stty echo` 会把终端 ECHO 打开，
+ *    与 readline 自回显叠加造成字符错乱；
+ * ② 自定义彩色 PS1 涉及 readline 对 ANSI 转义的宽度计算（须 `\[` `\]` 标记非打印区），
+ *    稍有差池提示符就叠字错乱（`mroot@p200:m/m#` 乱相）。
+ * 设备系统自带 PS1（如 Debian 的 `root@p200:/#`，含 `\w` 实时路径）已被验证显示正常，
+ * 直接沿用；这里只补零风险增强：ll 别名、ls 颜色（GNU ls 支持 --color）、关闭补全分页。
  */
 const BASH_INIT = [
-  'stty -echo',
-  `export PS1='\\[${ESC}[1;32m\\]\\u@\\h:\\[${ESC}[1;34m\\]\\w\\[${ESC}[0m\\]\\$ '`,
-  "if ls --color=auto / >/dev/null 2>&1; then alias ls='ls --color=auto'; fi",
   "alias ll='ls -alF'",
-  // 关闭补全分页（否则补全项多时会进 --More-- 需翻页/^C），失败静默
+  "alias ls='ls --color=auto'",
   "bind 'set page-completions off' 2>/dev/null || true",
-  'stty echo',
   '',
 ].join('\n');
 
