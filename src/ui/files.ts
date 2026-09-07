@@ -341,6 +341,14 @@ export function initFiles(client: AdbClient): void {
     return full.startsWith(p) ? full.slice(p.length) : full;
   }
 
+  /** 下载完成后清空勾选并复位按钮态（避免残留选中导致按钮仍可点/显示旧计数） */
+  function clearSelection(): void {
+    if (selected.size === 0) return;
+    selected.clear();
+    renderList();
+    refreshControlState();
+  }
+
   /** 单选一个普通文件：直接下载原名 */
   async function downloadSingle(entry: RemoteEntry): Promise<void> {
     if (busy) return;
@@ -352,6 +360,7 @@ export function initFiles(client: AdbClient): void {
       const blob = await client.pullFile(entry.path, meter.update);
       downloadBlob(blob, entry.name);
       log(`下载完成：${entry.name}（${formatBytes(blob.size)}，用时 ${meter.elapsed()}s）`, 'ok');
+      clearSelection();
     } catch (e) {
       log(`下载失败：${toChinese(e)}`, 'err');
     } finally {
@@ -401,6 +410,7 @@ export function initFiles(client: AdbClient): void {
         `打包完成：${baseName}.zip（${list.length} 个文件，${formatBytes(total)}，用时 ${meter.elapsed()}s）`,
         'ok',
       );
+      clearSelection();
     } catch (e) {
       log(`下载失败：${toChinese(e)}`, 'err');
     } finally {
