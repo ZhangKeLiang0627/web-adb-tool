@@ -234,11 +234,14 @@ export function initFiles(client: AdbClient): void {
     });
 
     const bullet = document.createElement('span');
-    bullet.className = entry.isDir ? 'fm-bullet dir' : 'fm-bullet';
+    bullet.className = 'fm-bullet' + (entry.isDir ? ' dir' : '');
 
     const name = document.createElement('span');
     name.className = 'fm-name' + (entry.isDir ? ' is-dir' : '');
-    name.textContent = entry.isDir ? entry.name + '/' : entry.name;
+    const nameText = document.createElement('span');
+    nameText.className = 'fm-name-text';
+    nameText.textContent = entry.isDir ? entry.name + '/' : entry.name;
+    name.append(bullet, nameText);
     name.title = `${entry.path}\n${formatBytes(entry.size)} · ${octal(entry.permission)} · ${fmtTime(entry.mtime)}`;
 
     const size = document.createElement('span');
@@ -612,6 +615,9 @@ function toChinese(e: unknown): string {
   }
   if (/argument list too long|E2BIG/i.test(msg)) {
     return '参数过长，请分批操作';
+  }
+  if (/socket open failed/i.test(msg)) {
+    return '设备端拒绝新建会话（已自动重试仍失败）。若 Shell 栏正在跑命令请先中断，或断开重连后再试';
   }
   return msg || '操作失败';
 }

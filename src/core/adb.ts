@@ -463,21 +463,41 @@ export class AdbClient {
     await this.execArgs(['chmod', mode, path]);
   }
 
-  /** 设备端删除（recursive=true 用 rm -rf，否则 rm -f；逐个执行便于定位失败项） */
+  /** 设备端删除（recursive=true 用 rm -rf，否则 rm -f）。
+   *  选中项合成单条命令分批执行，避免逐个 open shell（部分设备 adbd 并发会话受限时
+   *  会回 "Socket open failed"）；分批上限兼顾命令行长度。 */
   async removeRemote(paths: string[], recursive: boolean): Promise<void> {
-    for (const p of paths) {
-      await this.execArgs(recursive ? ['rm', '-rf', p] : ['rm', '-f', p]);
+    const flag = recursive ? ['-rf'] : ['-f'];
+    const BATCH = 32;
+    for (let i = 0; i < paths.length; i += BATCH) {
+      await this.execArgs(['rm', ...flag, ...paths.slice(i, i + BATCH)]);
     }
   }
 
-  /** 执行 argv 数组形式的 shell 命令，stderr 非空或退出码非 0 即抛错 */
+  /** 执行 argv 形式的 shell 命令，stderr 非空或退出码非 0 即抛错；
+   *  设备端在 OPEN 阶段偶发直接回 CLOSE（Socket open failed），退避后自动重试一次 */
   private async execArgs(args: string[]): Promise<void> {
     const adb = this.requireAdb();
+    try {
+      await this.execOne(adb, args);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/Socket open failed/i.test(msg)) throw e;
+      await sleepMs(350);
+      await this.execOne(adb, args);
+    }
+  }
+
+  /** 真正执行：shell(v2) 协议会把 argv 直接 join(" ") 成设备端命令字符串、不处理
+   *  空格/引号，因此逐个用 POSIX 单引号包裹参数，防止含空格/元字符的路径被设备端
+   *  二次拆词（曾导致删错对象 / 报 is a directory）；
+   *  none 协议是 exec 语义、无 shell 拆词，保持原样传递 */
+  private async execOne(adb: Adb, args: string[]): Promise<void> {
     const shellProto = adb.subprocess.shellProtocol;
-    // shell / none 两种协议的 spawnWait 返回结构略有差异，用宽松结构统一承接
+    const argv = shellProto ? args.map(shellQuote) : args;
     const res = (shellProto
-      ? await shellProto.spawnWait(args)
-      : await adb.subprocess.noneProtocol.spawnWait(args)) as {
+      ? await shellProto.spawnWait(argv)
+      : await adb.subprocess.noneProtocol.spawnWait(argv)) as {
       stdout?: string;
       stderr?: string;
       exitCode?: number | null;
@@ -623,3 +643,12 @@ const SH_INIT = [
   "alias ll='ls -alF'",
   '',
 ].join('\n');
+
+/** POSIX 单引号包裹 shell 参数；参数内含单引号时按 '\'' 转义（与 @yume-chan/adb 的 escapeArg 同款） */
+function shellQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

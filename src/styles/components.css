@@ -255,25 +255,35 @@
 .fm-row.selected {
   background: var(--accent-soft);
 }
+/* 名称格 = 目录小方块 + 文本（同处一个弹性列；文本占满并仅在真正放不下时省略尾部，悬停有 title 提示） */
+.fm-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+}
+.fm-name-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fm-name.is-dir .fm-name-text {
+  font-weight: 500;
+}
 .fm-bullet {
+  flex: 0 0 8px;
   width: 8px;
   height: 8px;
   border-radius: 2px;
   border: 1px solid var(--text-muted);
-  justify-self: center;
 }
 .fm-bullet.dir {
   background: var(--accent);
   border-color: var(--accent);
-}
-.fm-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-primary);
-}
-.fm-name.is-dir {
-  font-weight: 500;
 }
 .fm-meta {
   color: var(--text-muted);
