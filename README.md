@@ -1,5 +1,7 @@
 # web-adb-tool
 
+**简体中文** | [English](README.en.md)
+
 基于 **WebUSB** 的浏览器端 ADB 工具，无需安装任何驱动或 adb 可执行文件，打开网页即可连接设备（针对全志 / 瑞芯微等 Linux 板，兼容 Android 设备）。
 
 ![preview](docs/preview.png)

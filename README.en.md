@@ -1,5 +1,7 @@
 # web-adb-tool
 
+[简体中文](README.md) | **English**
+
 A browser-side ADB tool powered by **WebUSB**. No driver or `adb` binary needed — open the page and connect to your device. Built for Allwinner / Rockchip Linux boards, and also works with Android devices.
 
 ![preview](docs/preview.png)
