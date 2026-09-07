@@ -1,8 +1,11 @@
 /* =============================================================================
  * 布局（layout）—— 换布局 / 换分区排列只改这个文件
  * -----------------------------------------------------------------------------
- * 当前布局：header 顶栏 + 三栏（连接 / Shell / 文件）
- * 换布局 = 改 .app-main 的 grid-template-columns / 区域排列，DOM 结构不动。
+ * 当前布局：header 顶栏 + 三栏（连接 | Shell | 文件），栏间可拖拽分隔条调宽。
+ * - 宽度由 .app-main 上的 CSS 变量控制：--w-connect / --w-files；
+ * - 拖动分隔条时由 src/ui/layout.ts 更新这两个变量（并持久化到 localStorage）；
+ * - Shell 栏 flex:1 自动占满剩余宽度；
+ * - 换布局 = 改 .app-main 的子项排列 / 变量默认值，DOM 结构不动。
  * ========================================================================== */
 
 .app-header {
@@ -33,12 +36,16 @@
   gap: var(--space-3);
 }
 
+/* ---- 三栏主区（flex 行），宽度变量默认值写在这里 ---- */
 .app-main {
+  --w-connect: 240px;
+  --w-files: 460px;
+
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 380px;
-  gap: var(--space-4);
+  display: flex;
+  align-items: stretch;
+  gap: 0; /* 栏间距由拖拽分隔条占据 */
   padding: var(--space-4);
   overflow: hidden;
 }
@@ -50,7 +57,20 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0; /* 允许 flex 收缩到比内容小，配合内部滚动 */
   overflow: hidden;
+}
+
+/* 连接 / 文件：宽度跟随变量；Shell：自动占满剩余空间 */
+.panel-connect {
+  flex: 0 0 var(--w-connect);
+}
+.panel-shell {
+  flex: 1 1 0;
+  min-width: 280px;
+}
+.panel-files {
+  flex: 0 0 var(--w-files);
 }
 
 .panel-title {
@@ -66,14 +86,63 @@
   gap: var(--space-2);
 }
 
-/* 窄屏（<900px）改为上下堆叠，便于移动端 / 小窗 */
-@media (max-width: 900px) {
+/* ---- 拖拽分隔条（两个把手，位于面板间隙） ---- */
+.pane-resizer {
+  --resizer-handle: 3px;
+  flex: 0 0 12px;
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+.pane-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--resizer-handle);
+  transform: translateX(-50%);
+  background: var(--border);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, width 0.12s ease;
+}
+.pane-resizer:hover::after,
+.pane-resizer.dragging::after {
+  opacity: 1;
+  background: var(--accent);
+  width: 5px;
+}
+/* 拖动过程中整页禁用文本选择与鼠标事件干扰 */
+body.pane-resizing {
+  cursor: col-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+body.pane-resizing iframe {
+  pointer-events: none;
+}
+
+/* ---- 窄屏（<980px）：拖拽意义不大，改上下堆叠并隐藏分隔条 ---- */
+@media (max-width: 980px) {
   .app-main {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(240px, 1fr) auto;
+    flex-direction: column;
     overflow: auto;
   }
+  .pane-resizer {
+    display: none;
+  }
+  .panel-connect,
+  .panel-files {
+    flex: none;
+    height: 200px;
+  }
+  .panel-connect {
+    height: auto;
+    max-height: 260px;
+  }
   .panel-shell {
-    min-height: 300px;
+    flex: 1 1 320px;
   }
 }
