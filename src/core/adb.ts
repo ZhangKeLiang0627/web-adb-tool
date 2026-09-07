@@ -36,6 +36,8 @@ export class AdbClient {
   private adb: Adb | null = null;
   private readonly credentialStore = new AdbWebCredentialStore('web-adb-tool');
   private readonly listeners = new Set<StateListener>();
+  /** bash 探测结果缓存：null = 尚未探测；避免每次「新终端」都重探一次 */
+  private bashChecked: boolean | null = null;
 
   get connected(): boolean {
     return this.adb !== null;
@@ -85,6 +87,7 @@ export class AdbClient {
       await this.adb.close();
     } finally {
       this.adb = null;
+      this.bashChecked = null; // 换设备后重新探测 bash
       this.emit(false);
     }
   }
@@ -142,6 +145,32 @@ export class AdbClient {
   }
 
   /**
+   * 探测设备是否安装了 bash。
+   * 不依赖退出码（shell 协议 non-PTY spawn 的 exited 在部分设备恒为 null），
+   * 改为读 `command -v bash` 的 stdout——只要输出含 bash 路径即视为已安装。
+   * 结果缓存到实例字段，避免重复探测。
+   */
+  private async detectBash(): Promise<boolean> {
+    if (this.bashChecked !== null) return this.bashChecked;
+    let useBash = false;
+    try {
+      let out = '';
+      await this.shell(
+        'command -v bash',
+        (t) => {
+          out += t;
+        },
+        () => {},
+      );
+      useBash = /\bbash\b/.test(out);
+    } catch {
+      useBash = false;
+    }
+    this.bashChecked = useBash;
+    return useBash;
+  }
+
+  /**
    * 打开一个持久的交互式 PTY 会话（默认 sh），用于真终端体验。
    * - onData：设备输出的原始字节（含 ANSI 转义序列），UI 层直接喂给终端渲染。
    * - onExit：会话结束（进程退出 / 连接断开）时回调退出码；fallback 到 none 协议时无退出码，传 null。
@@ -156,15 +185,12 @@ export class AdbClient {
     // 探测设备是否有 bash：有则用它（tab 补全 + 完整彩色 PS1 + 路径显示），
     // 否则退回 busybox sh（仅基础体验）。busybox sh 不识别 \e 且常不展开 \u \h \w，
     // 导致上一版提示符乱码，故此处按 shell 能力分两套初始化脚本。
-    // 注意：spawn() 对字符串命令用 splitCommand 按空格拆 argv，不认识 shell 重定向，
-    // 所以这里绝不能写 `which bash >/dev/null 2>&1`（会被拆成字面参数，导致 which 返回非 0
-    // 而误判无 bash）。直接 `which bash` 靠退出码判断即可。
-    let useBash = false;
-    try {
-      useBash = (await this.shell('which bash', () => {}, () => {})) === 0;
-    } catch {
-      useBash = false;
-    }
+    // 关键坑：@yume-chan/adb 的 shell 协议 non-PTY spawn 在不少设备上 `exited` 返回 null
+    // （而非真实退出码），若用 `退出码 === 0` 判断会把有 bash 的设备误判成没有。
+    // 故改为读 stdout 内容判断——`command -v bash` 输出里出现 bash 路径即认定已安装。
+    // 注意 spawn() 用 splitCommand 按空格拆 argv，不认 shell 操作符，所以这里只放单个命令，
+    // 不能写 `||` / `&&` / `>/dev/null` 等重定向。
+    const useBash = await this.detectBash();
 
     const encoder = new TextEncoder();
     const command = useBash ? 'bash' : 'sh';
