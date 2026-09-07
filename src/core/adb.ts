@@ -151,6 +151,8 @@ export class AdbClient {
     const adb = this.requireAdb();
     const shellProto = adb.subprocess.shellProtocol;
 
+    const encoder = new TextEncoder();
+
     if (shellProto) {
       // shell 协议：支持 resize / sigint，是完整终端体验的首选路径
       const proc = (await shellProto.pty({
@@ -161,7 +163,7 @@ export class AdbClient {
       const writer = proc.input.getWriter();
       void pumpThenExit(proc, onData, onExit);
 
-      return {
+      const session: ShellSession = {
         write: (data) => writer.write(data),
         resize: (rows, cols) => proc.resize?.(rows, cols) ?? Promise.resolve(),
         sigint: () => proc.sigint?.() ?? Promise.resolve(),
@@ -169,6 +171,9 @@ export class AdbClient {
           await proc.kill?.();
         },
       };
+      // 注入终端环境（彩色 PS1 + ls 颜色），让提示符显示当前路径
+      await session.write(encoder.encode(SHELL_INIT));
+      return session;
     }
 
     // 设备不支持 shell 协议时，退回 none 协议（无 resize，退出码为 null）
@@ -176,7 +181,7 @@ export class AdbClient {
     const writer = proc.input.getWriter();
     void pumpThenExit(proc, onData, onExit);
 
-    return {
+    const session: ShellSession = {
       write: (data) => writer.write(data),
       resize: () => Promise.resolve(),
       sigint: () => proc.sigint?.() ?? Promise.resolve(),
@@ -184,6 +189,8 @@ export class AdbClient {
         await proc.kill?.();
       },
     };
+    await session.write(encoder.encode(SHELL_INIT));
+    return session;
   }
 
   /** 上传本地文件到设备（push），带进度回调 */
@@ -193,6 +200,8 @@ export class AdbClient {
     onProgress: (done: number, total: number) => void,
   ): Promise<void> {
     const adb = this.requireAdb();
+    // RK/T113 等 Linux 板没有 Android 的 /data 目录，push 前先确保父目录存在
+    await this.ensureParentDir(remotePath);
     const sync = await adb.sync();
     const total = file.size;
     const CHUNK = 64 * 1024;
@@ -257,6 +266,29 @@ export class AdbClient {
       return new Blob(chunks as unknown as BlobPart[]);
     } finally {
       await sync.dispose();
+    }
+  }
+
+  /** push 前确保父目录存在（Linux 板无 /data，且 sync 不保证自动建目录） */
+  private async ensureParentDir(remotePath: string): Promise<void> {
+    const slash = remotePath.lastIndexOf('/');
+    if (slash <= 0) return; // 相对路径或根下直接放，无需处理
+    const parent = remotePath.slice(0, slash) || '/';
+
+    const adb = this.requireAdb();
+    try {
+      const shellProto = adb.subprocess.shellProtocol;
+      if (shellProto) {
+        const res = await shellProto.spawnWait(['mkdir', '-p', parent]);
+        if (res.exitCode !== 0) {
+          throw new Error(`无法创建目录 ${parent}（请确认路径正确且该目录可写）`);
+        }
+      } else {
+        await adb.subprocess.noneProtocol.spawnWait(['mkdir', '-p', parent]);
+      }
+    } catch (e) {
+      // mkdir 失败（无权限/目录非法）给出中文提示，其余连接错误交由 sync.write 报真实错误
+      if (e instanceof Error && e.message.startsWith('无法创建')) throw e;
     }
   }
 
@@ -331,3 +363,18 @@ async function pumpThenExit(
     onExit(null);
   }
 }
+
+/**
+ * 打开终端后注入的初始化脚本（兼容 busybox sh / dash）：
+ * - 彩色 PS1：绿色 `用户@主机:` + 蓝色 `当前路径`，让用户随时知道自己在哪个目录；
+ * - 若 ls 支持 --color 则启用目录/文件着色，否则静默跳过；
+ * - 用 stty -echo 包裹，避免初始化命令回显刷屏。
+ */
+const SHELL_INIT = [
+  'stty -echo',
+  "export PS1='\\e[1;32m\\u@\\h:\\e[1;34m\\w\\e[0m\\$ '",
+  "if ls --color=auto / >/dev/null 2>&1; then alias ls='ls --color=auto'; fi",
+  "alias ll='ls -alF'",
+  'stty echo',
+  '',
+].join('\n');
