@@ -156,9 +156,12 @@ export class AdbClient {
     // 探测设备是否有 bash：有则用它（tab 补全 + 完整彩色 PS1 + 路径显示），
     // 否则退回 busybox sh（仅基础体验）。busybox sh 不识别 \e 且常不展开 \u \h \w，
     // 导致上一版提示符乱码，故此处按 shell 能力分两套初始化脚本。
+    // 注意：spawn() 对字符串命令用 splitCommand 按空格拆 argv，不认识 shell 重定向，
+    // 所以这里绝不能写 `which bash >/dev/null 2>&1`（会被拆成字面参数，导致 which 返回非 0
+    // 而误判无 bash）。直接 `which bash` 靠退出码判断即可。
     let useBash = false;
     try {
-      useBash = (await this.shell('which bash >/dev/null 2>&1', () => {}, () => {})) === 0;
+      useBash = (await this.shell('which bash', () => {}, () => {})) === 0;
     } catch {
       useBash = false;
     }
@@ -403,17 +406,19 @@ const BASH_INIT = [
 ].join('\n');
 
 /**
- * busybox sh / dash 兜底初始化：这类 shell 不展开 \u \h \w，
- * 故用 whoami/hostname/pwd 命令替换构造提示符，并覆盖 cd 让路径实时刷新。
+ * busybox sh / dash 兜底初始化：这类 shell 不展开 \u \h \w，且通常无行编辑（无方向键历史/tab 补全）。
+ * 故：① 用 whoami/hostname/pwd 命令替换构造提示符，覆盖 cd 让路径实时刷新；
+ * ② `stty -icanon -echo` 进入 raw 模式、关闭回显，交由前端 readline 接管（缓存输入+自回显+历史），
+ *   否则方向键会作为 ESC 字节混入命令导致乱码。
+ * 提示符尾部保持 `${ESC}[0m# `（root 为 #，普通用户为 $）这一固定特征，前端据此识别"命令执行完、回到提示符"。
  */
 const SH_INIT = [
-  'stty -echo',
+  'stty -icanon -echo 2>/dev/null || true',
   `_p='${ESC}[1;32m'; _b='${ESC}[1;34m'; _r='${ESC}[0m';`,
   `_setps() { PS1="$_p$(whoami)@$(hostname):$_b$(pwd)$_r# "; }`,
   '_setps',
   'cd() { command cd "$@" && _setps; }',
   "if ls --color=auto / >/dev/null 2>&1; then alias ls='ls --color=auto'; fi",
   "alias ll='ls -alF'",
-  'stty echo',
   '',
 ].join('\n');
