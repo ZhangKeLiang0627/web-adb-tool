@@ -196,6 +196,14 @@
   transition: width 0.2s ease;
 }
 
+.file-progress-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-height: 1.4em;
+  word-break: break-all;
+}
+
 .file-log {
   font-size: 12px;
   color: var(--text-secondary);

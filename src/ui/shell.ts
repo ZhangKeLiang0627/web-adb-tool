@@ -41,7 +41,7 @@ export function initShell(client: AdbClient): void {
     term.reset();
     writePrompt('正在连接终端…\r\n');
     try {
-      session = await client.openShell(
+      const s = await client.openShell(
         (data) => term.write(data),
         (code) => {
           // 会话结束：清理引用，给用户提示（可能是进程退出或设备断开）
@@ -54,7 +54,12 @@ export function initShell(client: AdbClient): void {
           writePrompt('点击右上角「新终端」可重新打开，或重新连接设备。\r\n');
         },
       );
-      writePrompt('终端已就绪（sh）。直接输入命令即可。\r\n');
+      session = s;
+      if (s.shellType === 'bash') {
+        writePrompt('终端已就绪（bash）。直接输入命令，支持 Tab 补全。\r\n');
+      } else {
+        writePrompt('终端已就绪（sh）。直接输入命令即可。（设备未安装 bash，Tab 补全不可用）\r\n');
+      }
       term.focus();
     } catch (err) {
       writePrompt(`\r\n打开终端失败：${err instanceof Error ? err.message : String(err)}\r\n`);

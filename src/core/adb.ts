@@ -26,6 +26,8 @@ export interface ShellSession {
   resize(rows: number, cols: number): Promise<void>;
   sigint(): Promise<void>;
   kill(): Promise<void>;
+  /** 实际使用的 shell：bash 支持 tab 补全 + 完整 PS1，busybox sh 仅基础体验 */
+  shellType: 'bash' | 'sh';
 }
 
 type StateListener = (connected: boolean) => void;
@@ -151,12 +153,24 @@ export class AdbClient {
     const adb = this.requireAdb();
     const shellProto = adb.subprocess.shellProtocol;
 
+    // 探测设备是否有 bash：有则用它（tab 补全 + 完整彩色 PS1 + 路径显示），
+    // 否则退回 busybox sh（仅基础体验）。busybox sh 不识别 \e 且常不展开 \u \h \w，
+    // 导致上一版提示符乱码，故此处按 shell 能力分两套初始化脚本。
+    let useBash = false;
+    try {
+      useBash = (await this.shell('which bash >/dev/null 2>&1', () => {}, () => {})) === 0;
+    } catch {
+      useBash = false;
+    }
+
     const encoder = new TextEncoder();
+    const command = useBash ? 'bash' : 'sh';
+    const init = useBash ? BASH_INIT : SH_INIT;
 
     if (shellProto) {
       // shell 协议：支持 resize / sigint，是完整终端体验的首选路径
       const proc = (await shellProto.pty({
-        command: 'sh',
+        command,
         terminalType: 'xterm-256color',
       })) as unknown as PtyLike;
 
@@ -170,14 +184,15 @@ export class AdbClient {
         kill: async () => {
           await proc.kill?.();
         },
+        shellType: command,
       };
       // 注入终端环境（彩色 PS1 + ls 颜色），让提示符显示当前路径
-      await session.write(encoder.encode(SHELL_INIT));
+      await session.write(encoder.encode(init));
       return session;
     }
 
     // 设备不支持 shell 协议时，退回 none 协议（无 resize，退出码为 null）
-    const proc = (await adb.subprocess.noneProtocol.pty('sh')) as unknown as PtyLike;
+    const proc = (await adb.subprocess.noneProtocol.pty(command)) as unknown as PtyLike;
     const writer = proc.input.getWriter();
     void pumpThenExit(proc, onData, onExit);
 
@@ -188,8 +203,9 @@ export class AdbClient {
       kill: async () => {
         await proc.kill?.();
       },
+      shellType: command,
     };
-    await session.write(encoder.encode(SHELL_INIT));
+    await session.write(encoder.encode(init));
     return session;
   }
 
@@ -200,28 +216,34 @@ export class AdbClient {
     onProgress: (done: number, total: number) => void,
   ): Promise<void> {
     const adb = this.requireAdb();
-    // RK/T113 等 Linux 板没有 Android 的 /data 目录，push 前先确保父目录存在
-    await this.ensureParentDir(remotePath);
     const sync = await adb.sync();
-    const total = file.size;
-    const CHUNK = 64 * 1024;
-    let done = 0;
-
-    const stream = new ReadableStream<Uint8Array>({
-      async pull(controller) {
-        if (done >= total) {
-          controller.close();
-          return;
-        }
-        const end = Math.min(done + CHUNK, total);
-        const buf = new Uint8Array(await file.slice(done, end).arrayBuffer());
-        done += buf.byteLength;
-        onProgress(done, total);
-        controller.enqueue(buf);
-      },
-    });
-
     try {
+      // 目标路径若指向已存在的目录，自动拼上文件名（用户填目录名上传更符合直觉，
+      // 否则 sync.write 会在 SEND 阶段被 adbd 以 "Is a directory" 拒绝，进度条也动不了）
+      if (await sync.isDirectory(remotePath)) {
+        remotePath = remotePath.replace(/\/+$/, '') + '/' + file.name;
+      }
+      // RK/T113 等 Linux 板没有 Android 的 /data 目录，push 前先确保父目录存在
+      await this.ensureParentDir(remotePath);
+
+      const total = file.size;
+      const CHUNK = 64 * 1024;
+      let done = 0;
+
+      const stream = new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          if (done >= total) {
+            controller.close();
+            return;
+          }
+          const end = Math.min(done + CHUNK, total);
+          const buf = new Uint8Array(await file.slice(done, end).arrayBuffer());
+          done += buf.byteLength;
+          onProgress(done, total);
+          controller.enqueue(buf);
+        },
+      });
+
       // @yume-chan 的流类型（ArrayBufferLike）与 DOM 的 ReadableStream 类型
       // 在 TS 上不兼容，但运行时二者均为原生 ReadableStream，此处安全断言。
       await sync.write({
@@ -364,15 +386,32 @@ async function pumpThenExit(
   }
 }
 
+/** 真实 ESC 控制字节（字符码 27）。busybox sh 不认识 `\e` 这种 bash 转义，必须用真字节才能着色。 */
+const ESC = '\x1b';
+
 /**
- * 打开终端后注入的初始化脚本（兼容 busybox sh / dash）：
- * - 彩色 PS1：绿色 `用户@主机:` + 蓝色 `当前路径`，让用户随时知道自己在哪个目录；
- * - 若 ls 支持 --color 则启用目录/文件着色，否则静默跳过；
- * - 用 stty -echo 包裹，避免初始化命令回显刷屏。
+ * bash 专属初始化：bash 完整支持 PS1 转义（\u \h \w \$）与 tab 补全。
+ * 颜色用真实 ESC 字节注入，`\u@\h:\w\$` 由 bash 展开为 用户名@主机名:路径# 。
  */
-const SHELL_INIT = [
+const BASH_INIT = [
   'stty -echo',
-  "export PS1='\\e[1;32m\\u@\\h:\\e[1;34m\\w\\e[0m\\$ '",
+  `export PS1='${ESC}[1;32m\\u@\\h:${ESC}[1;34m\\w${ESC}[0m\\$ '`,
+  "if ls --color=auto / >/dev/null 2>&1; then alias ls='ls --color=auto'; fi",
+  "alias ll='ls -alF'",
+  'stty echo',
+  '',
+].join('\n');
+
+/**
+ * busybox sh / dash 兜底初始化：这类 shell 不展开 \u \h \w，
+ * 故用 whoami/hostname/pwd 命令替换构造提示符，并覆盖 cd 让路径实时刷新。
+ */
+const SH_INIT = [
+  'stty -echo',
+  `_p='${ESC}[1;32m'; _b='${ESC}[1;34m'; _r='${ESC}[0m';`,
+  `_setps() { PS1="$_p$(whoami)@$(hostname):$_b$(pwd)$_r# "; }`,
+  '_setps',
+  'cd() { command cd "$@" && _setps; }',
   "if ls --color=auto / >/dev/null 2>&1; then alias ls='ls --color=auto'; fi",
   "alias ll='ls -alF'",
   'stty echo',
