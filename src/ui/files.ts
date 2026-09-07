@@ -363,18 +363,19 @@ export function initFiles(client: AdbClient): void {
   /** 选中多文件/目录：单文件直下，其余打成 zip 一次性下载 */
   async function downloadSelection(): Promise<void> {
     if (selected.size === 0) return;
+    // 仅选了一个普通文件 → 直接下载（downloadSingle 自行管理 busy，
+    // 不能在此先 setBusy，否则它的 busy 守卫会直接 return）
+    if (selected.size === 1) {
+      const entry = entries.find((e) => e.path === Array.from(selected)[0]);
+      if (entry && !entry.isDir) {
+        await downloadSingle(entry);
+        return;
+      }
+    }
     const meter = createMeter();
     setBusy(true);
     meter.reset();
     try {
-      // 仅选了一个普通文件 → 直接下载
-      if (selected.size === 1) {
-        const entry = entries.find((e) => e.path === Array.from(selected)[0]);
-        if (entry && !entry.isDir) {
-          await downloadSingle(entry);
-          return;
-        }
-      }
       const list = await collectForDownload();
       if (!list) return;
 
