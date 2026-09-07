@@ -248,11 +248,8 @@ export function initFiles(client: AdbClient): void {
     size.className = 'fm-meta';
     size.textContent = entry.isDir ? '—' : formatBytes(entry.size);
 
-    const time = document.createElement('span');
-    time.className = 'fm-meta fm-time';
-    time.textContent = fmtTime(entry.mtime);
-
-    row.append(cb, bullet, name, size, time);
+    // 行内恰好 3 个元素 = 表头 3 列：复选框 | 名称(含目录小方块) | 大小
+    row.append(cb, name, size);
 
     // 单击 = 选中/取消；双击 = 目录进入 / 文件直接下载
     row.addEventListener('click', () => toggleSelect(entry.path));

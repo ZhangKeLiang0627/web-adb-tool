@@ -182,8 +182,6 @@
   overflow: hidden;
   gap: var(--space-2);
   padding: var(--space-3);
-  /* 以本容器宽度为基准做容器查询：窄栏时自动隐藏次要列 */
-  container-type: inline-size;
 }
 .fm-pathbar {
   display: flex;
@@ -217,7 +215,9 @@
 .fm-head,
 .fm-row {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 70px 110px;
+  /* 3 列与行内 3 个元素一一对应（已移除「修改时间」列）：
+     第1列 复选框 · 第2列 名称（弹性，占满剩余，面板拉宽即显示更长）· 第3列 大小 */
+  grid-template-columns: 24px minmax(0, 1fr) 70px;
   align-items: center;
   gap: var(--space-2);
   padding: 2px 6px;
@@ -294,17 +294,6 @@
   font-size: 11.5px;
 }
 
-/* ---- 文件面板宽度自适应（容器查询）----
- * 面板被拖窄时信息放不下，策略：
- *  < 600px：隐藏「修改时间」列，仅留 复选框+名称+大小，名称尽量完整；
- *  ≥ 600px：三列齐显（时间列尾随在名称后，时间列本身可省略）。
- * 容器 = .panel-files .files-body（container-type: inline-size）。 */
-@container (max-width: 599px) {
-  .fm-time-col,
-  .fm-time {
-    display: none;
-  }
-}
 .fm-empty {
   padding: 16px 4px;
   text-align: center;

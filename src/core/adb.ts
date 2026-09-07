@@ -488,20 +488,26 @@ export class AdbClient {
     }
   }
 
-  /** 真正执行：shell(v2) 协议会把 argv 直接 join(" ") 成设备端命令字符串、不处理
-   *  空格/引号，因此逐个用 POSIX 单引号包裹参数，防止含空格/元字符的路径被设备端
-   *  二次拆词（曾导致删错对象 / 报 is a directory）；
-   *  none 协议是 exec 语义、无 shell 拆词，保持原样传递 */
+  /** 真正执行一条命令，stderr 非空或退出码非 0 即抛错。
+   *  优先新式 shell(v2) 通道：其 spawner 会把 argv 直接 join(" ") 成设备端命令串、
+   *  不处理空格/引号，因此逐个用 POSIX 单引号包裹参数防二次拆词；
+   *  部分设备（如精简 adbd）未实现 shell(v2) raw 会话，open 阶段即被拒
+   *  （Socket open failed，且终端能开是因为它走 pty 分支），此时降级到最通用的
+   *  exec 通道（无 pty、设备端按空格拆参，参数保持原样）。 */
   private async execOne(adb: Adb, args: string[]): Promise<void> {
     const shellProto = adb.subprocess.shellProtocol;
-    const argv = shellProto ? args.map(shellQuote) : args;
-    const res = (shellProto
-      ? await shellProto.spawnWait(argv)
-      : await adb.subprocess.noneProtocol.spawnWait(argv)) as {
-      stdout?: string;
-      stderr?: string;
-      exitCode?: number | null;
-    };
+    let raw: unknown;
+    try {
+      raw = shellProto
+        ? await shellProto.spawnWait(args.map(shellQuote))
+        : await adb.subprocess.noneProtocol.spawnWait(args);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!(shellProto && /Socket open failed/i.test(msg))) throw e;
+      // 降级：设备未实现 shell(v2) raw 会话时（open 即被拒），改用最通用的 exec 通道
+      raw = await adb.subprocess.noneProtocol.spawnWait(args);
+    }
+    const res = raw as { stdout?: string; stderr?: string; exitCode?: number | null };
     const stderr = (res.stderr ?? '').trim();
     const code = res.exitCode;
     if (stderr || (typeof code === 'number' && code !== 0)) {
