@@ -164,27 +164,157 @@
   background-color: transparent !important;
 }
 
-/* ---------- 文件操作 ---------- */
-.file-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.file-row label {
+/* ---------- 小号 / 危险按钮 ---------- */
+.btn-sm {
+  padding: 3px 10px;
   font-size: 12px;
-  color: var(--text-secondary);
 }
-.file-actions {
-  display: flex;
-  gap: var(--space-2);
+.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: transparent;
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--bg-hover);
 }
 
+/* ---------- 文件管理器 ---------- */
+.panel-files .files-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+.fm-pathbar {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+.fm-path {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.fm-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: -2px 0 2px;
+  flex-shrink: 0;
+}
+.fm-crumb {
+  padding: 1px 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-radius: 6px;
+}
+.fm-crumb:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.fm-head,
+.fm-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 64px 88px;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px 6px;
+}
+.fm-head {
+  font-size: 11px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  flex-shrink: 0;
+}
+.fm-head input,
+.fm-cb {
+  justify-self: center;
+  accent-color: var(--accent);
+}
+.fm-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.fm-row {
+  font-size: 12.5px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+.fm-row:hover {
+  background: var(--bg-hover);
+}
+.fm-row.selected {
+  background: var(--accent-soft);
+}
+.fm-bullet {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  border: 1px solid var(--text-muted);
+  justify-self: center;
+}
+.fm-bullet.dir {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.fm-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+.fm-name.is-dir {
+  font-weight: 500;
+}
+.fm-meta {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+}
+.fm-empty {
+  padding: 16px 4px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.fm-ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.fm-spacer {
+  flex: 1;
+}
+.fm-dragover {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+}
+
+/* ---------- 进度 / 日志 ---------- */
 .progress {
   height: 8px;
   background: var(--bg-subtle);
   border-radius: 999px;
   overflow: hidden;
   visibility: hidden;
+  flex-shrink: 0;
 }
 .progress.visible {
   visibility: visible;
@@ -202,13 +332,19 @@
   font-variant-numeric: tabular-nums;
   min-height: 1.4em;
   word-break: break-all;
+  flex-shrink: 0;
 }
 
 .file-log {
   font-size: 12px;
   color: var(--text-secondary);
   min-height: 1.4em;
+  max-height: 84px;
+  overflow-y: auto;
   word-break: break-all;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  flex-shrink: 0;
 }
 .file-log.ok {
   color: var(--success);

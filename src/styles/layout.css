@@ -37,7 +37,7 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 300px;
+  grid-template-columns: 240px minmax(0, 1fr) 380px;
   gap: var(--space-4);
   padding: var(--space-4);
   overflow: hidden;

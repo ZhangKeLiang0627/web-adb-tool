@@ -17,6 +17,32 @@ export interface DeviceInfo {
   buildId: string;
 }
 
+/** 设备端目录中的一个条目（来自 adb sync LIST/readdir 协议） */
+export interface RemoteEntry {
+  name: string;
+  /** 完整绝对路径 */
+  path: string;
+  isDir: boolean;
+  /** 字节大小（目录通常为 0/4096） */
+  size: number;
+  /** 修改时间（Unix 秒） */
+  mtime: number;
+  /** 权限模式（如 0o755） */
+  permission: number;
+}
+
+/** 递归收集到的远端文件引用（供目录打包下载） */
+export interface RemoteFileRef {
+  path: string;
+  size: number;
+}
+
+/** 待批量上传的本地文件 + 目标路径 */
+export interface PushItem {
+  file: File;
+  targetPath: string;
+}
+
 /**
  * 交互式终端会话句柄 —— 由 openShell 创建，
  * UI 层拿到后把键盘输入 write 进去、把窗口尺寸 resize 过去，即可获得真终端体验。
@@ -238,7 +264,7 @@ export class AdbClient {
     return session;
   }
 
-  /** 上传本地文件到设备（push），带进度回调 */
+  /** 上传本地文件到设备（push），带进度回调（单文件便捷封装） */
   async pushFile(
     file: File,
     remotePath: string,
@@ -254,36 +280,86 @@ export class AdbClient {
       }
       // RK/T113 等 Linux 板没有 Android 的 /data 目录，push 前先确保父目录存在
       await this.ensureParentDir(remotePath);
-
       const total = file.size;
-      const CHUNK = 64 * 1024;
-      let done = 0;
-
-      const stream = new ReadableStream<Uint8Array>({
-        async pull(controller) {
-          if (done >= total) {
-            controller.close();
-            return;
-          }
-          const end = Math.min(done + CHUNK, total);
-          const buf = new Uint8Array(await file.slice(done, end).arrayBuffer());
-          done += buf.byteLength;
-          onProgress(done, total);
-          controller.enqueue(buf);
-        },
-      });
-
-      // @yume-chan 的流类型（ArrayBufferLike）与 DOM 的 ReadableStream 类型
-      // 在 TS 上不兼容，但运行时二者均为原生 ReadableStream，此处安全断言。
-      await sync.write({
-        filename: remotePath,
-        file: stream as unknown as import('@yume-chan/stream-extra').ReadableStream<
-          import('@yume-chan/stream-extra').MaybeConsumable<Uint8Array>
-        >,
-      });
+      await this.writeOne(sync, file, remotePath, (done) => onProgress(done, total));
     } finally {
       await sync.dispose();
     }
+  }
+
+  /**
+   * 批量上传多个文件到设备（共享同一条 sync 连接）。
+   * 自动为每个目标路径创建父目录；进度按字节汇总（onProgress(done, total)）。
+   */
+  async pushFiles(
+    items: PushItem[],
+    onFileStart: (label: string, index: number, total: number) => void,
+    onProgress: (done: number, total: number) => void,
+  ): Promise<void> {
+    if (items.length === 0) return;
+    const adb = this.requireAdb();
+    const sync = await adb.sync();
+
+    // 先为所有涉及到的父目录执行 mkdir -p（去重）
+    const parents = new Set<string>();
+    for (const it of items) {
+      const p = parentOf(it.targetPath);
+      if (p) parents.add(p);
+    }
+
+    const grandTotal = items.reduce((s, it) => s + it.file.size, 0);
+    let overallDone = 0;
+    try {
+      for (const p of parents) {
+        await this.ensureDir(p);
+      }
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        onFileStart(it.file.name, i + 1, items.length);
+        const base = overallDone;
+        await this.writeOne(sync, it.file, it.targetPath, (done) => {
+          onProgress(base + done, grandTotal);
+        });
+        overallDone += it.file.size;
+      }
+    } finally {
+      await sync.dispose();
+    }
+  }
+
+  /** 通过 sync.write 流式写单个文件（按 64KB 分块读本地文件） */
+  private async writeOne(
+    sync: import('@yume-chan/adb').AdbSync,
+    file: File,
+    targetPath: string,
+    onProgress: (done: number) => void,
+  ): Promise<void> {
+    const total = file.size;
+    const CHUNK = 64 * 1024;
+    let done = 0;
+
+    const stream = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        if (done >= total) {
+          controller.close();
+          return;
+        }
+        const end = Math.min(done + CHUNK, total);
+        const buf = new Uint8Array(await file.slice(done, end).arrayBuffer());
+        done += buf.byteLength;
+        onProgress(done);
+        controller.enqueue(buf);
+      },
+    });
+
+    // @yume-chan 的流类型（ArrayBufferLike）与 DOM 的 ReadableStream 类型
+    // 在 TS 上不兼容，但运行时二者均为原生 ReadableStream，此处安全断言。
+    await sync.write({
+      filename: targetPath,
+      file: stream as unknown as import('@yume-chan/stream-extra').ReadableStream<
+        import('@yume-chan/stream-extra').MaybeConsumable<Uint8Array>
+      >,
+    });
   }
 
   /** 从设备下载文件（pull），返回 Blob，带进度回调 */
@@ -320,26 +396,114 @@ export class AdbClient {
     }
   }
 
+  /**
+   * 列出设备目录内容（adb sync readdir 协议，v1/v2 由库自动协商）。
+   * 返回按「目录在前、按名称排序」的条目；不递归。
+   */
+  async listDir(path: string): Promise<RemoteEntry[]> {
+    const adb = this.requireAdb();
+    const sync = await adb.sync();
+    try {
+      const list = await sync.readdir(path);
+      const base = path.endsWith('/') ? path : path + '/';
+      return list
+        .filter((entry) => entry && !!entry.name && entry.name !== '.' && entry.name !== '..')
+        .map((entry) => ({
+          name: entry.name,
+          path: base + entry.name,
+          // type 为 4=Directory / 8=File / 10=Link 等；这里只把真正的目录当目录。
+          // 符号链接不跟随（避免误入循环/设备节点），当作普通条目展示。
+          isDir: entry.type === 4,
+          size: Number(entry.size),
+          mtime: Number(entry.mtime),
+          permission: entry.permission ?? 0,
+        }))
+        .sort((a, b) => {
+          if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+          return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+        });
+    } finally {
+      await sync.dispose();
+    }
+  }
+
+  /**
+   * 递归收集某目录下所有普通文件（供「整目录打包下载」）。
+   * 只下钻真正的目录；符号链接与设备节点不跟随、不计入。
+   */
+  async listTree(root: string): Promise<RemoteFileRef[]> {
+    const out: RemoteFileRef[] = [];
+    await this.walk(root, out);
+    return out;
+  }
+
+  private async walk(dir: string, out: RemoteFileRef[]): Promise<void> {
+    const entries = await this.listDir(dir);
+    for (const entry of entries) {
+      if (entry.isDir) {
+        await this.walk(entry.path, out);
+      } else {
+        out.push({ path: entry.path, size: entry.size });
+      }
+    }
+  }
+
+  /** 在设备上创建目录（mkdir -p，已存在不报错） */
+  async makeRemoteDir(path: string): Promise<void> {
+    await this.execArgs(['mkdir', '-p', path]);
+  }
+
+  /** 设备端重命名/移动（mv -f） */
+  async renameRemote(from: string, to: string): Promise<void> {
+    await this.execArgs(['mv', '-f', from, to]);
+  }
+
+  /** 设备端修改权限（chmod；mode 为字符串，如 '755' 或 '4755'） */
+  async chmodRemote(path: string, mode: string): Promise<void> {
+    await this.execArgs(['chmod', mode, path]);
+  }
+
+  /** 设备端删除（recursive=true 用 rm -rf，否则 rm -f；逐个执行便于定位失败项） */
+  async removeRemote(paths: string[], recursive: boolean): Promise<void> {
+    for (const p of paths) {
+      await this.execArgs(recursive ? ['rm', '-rf', p] : ['rm', '-f', p]);
+    }
+  }
+
+  /** 执行 argv 数组形式的 shell 命令，stderr 非空或退出码非 0 即抛错 */
+  private async execArgs(args: string[]): Promise<void> {
+    const adb = this.requireAdb();
+    const shellProto = adb.subprocess.shellProtocol;
+    // shell / none 两种协议的 spawnWait 返回结构略有差异，用宽松结构统一承接
+    const res = (shellProto
+      ? await shellProto.spawnWait(args)
+      : await adb.subprocess.noneProtocol.spawnWait(args)) as {
+      stdout?: string;
+      stderr?: string;
+      exitCode?: number | null;
+    };
+    const stderr = (res.stderr ?? '').trim();
+    const code = res.exitCode;
+    if (stderr || (typeof code === 'number' && code !== 0)) {
+      throw new Error(stderr || `${args[0]} 执行失败（exit=${code ?? '?'}）`);
+    }
+  }
+
+  /** mkdir -p（供 push / 文件管理器共用） */
+  private async ensureDir(path: string): Promise<void> {
+    if (!path || path === '/') return;
+    await this.execArgs(['mkdir', '-p', path]);
+  }
+
   /** push 前确保父目录存在（Linux 板无 /data，且 sync 不保证自动建目录） */
   private async ensureParentDir(remotePath: string): Promise<void> {
-    const slash = remotePath.lastIndexOf('/');
-    if (slash <= 0) return; // 相对路径或根下直接放，无需处理
-    const parent = remotePath.slice(0, slash) || '/';
-
-    const adb = this.requireAdb();
+    const parent = parentOf(remotePath);
+    if (!parent) return; // 根下直接放，无需处理
     try {
-      const shellProto = adb.subprocess.shellProtocol;
-      if (shellProto) {
-        const res = await shellProto.spawnWait(['mkdir', '-p', parent]);
-        if (res.exitCode !== 0) {
-          throw new Error(`无法创建目录 ${parent}（请确认路径正确且该目录可写）`);
-        }
-      } else {
-        await adb.subprocess.noneProtocol.spawnWait(['mkdir', '-p', parent]);
-      }
+      await this.ensureDir(parent);
     } catch (e) {
-      // mkdir 失败（无权限/目录非法）给出中文提示，其余连接错误交由 sync.write 报真实错误
-      if (e instanceof Error && e.message.startsWith('无法创建')) throw e;
+      if (e instanceof Error && e.message.includes('无法创建')) throw e;
+      // 其余（权限等）留给 sync.write 报真实错误
     }
   }
 
@@ -352,6 +516,13 @@ export class AdbClient {
 interface ChunkReader {
   read(): Promise<{ value?: Uint8Array; done: boolean }>;
   releaseLock(): void;
+}
+
+/** 取绝对路径的父目录；无父（根或非法）返回空串 */
+function parentOf(path: string): string {
+  const i = path.lastIndexOf('/');
+  if (i <= 0) return i === 0 ? '/' : '';
+  return path.slice(0, i);
 }
 
 interface ChunkStream {

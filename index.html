@@ -12,7 +12,7 @@
       <header class="app-header">
         <div class="brand">
           <span class="brand-name">web-adb-tool</span>
-          <span class="badge badge-version">v0.2.6</span>
+          <span class="badge badge-version">v0.3.0</span>
         </div>
         <div class="header-actions">
           <div id="conn-status" class="status">
@@ -41,23 +41,48 @@
         </section>
 
         <section class="panel panel-files">
-          <h2 class="panel-title">文件传输</h2>
+          <h2 class="panel-title">
+            <span>文件管理</span>
+            <button id="fm-refresh" class="btn btn-ghost" type="button" disabled>刷新</button>
+          </h2>
           <div class="files-body">
-            <div class="file-row">
-              <label for="file-remote">远程路径（目录或完整文件路径）</label>
+            <div class="fm-pathbar">
               <input
-                id="file-remote"
-                class="input"
+                id="fm-path"
+                class="input fm-path"
                 type="text"
-                placeholder="/tmp（目录自动拼文件名，或 /tmp/foo.txt）"
+                placeholder="输入绝对路径回车跳转，如 /tmp"
+                autocomplete="off"
+                spellcheck="false"
                 disabled
               />
+              <button id="fm-go" class="btn" type="button" disabled>前往</button>
+              <button id="fm-up" class="btn" type="button" disabled>上级</button>
             </div>
-            <div class="file-actions">
-              <button id="btn-upload" class="btn" type="button" disabled>上传 (push)</button>
-              <button id="btn-download" class="btn" type="button" disabled>下载 (pull)</button>
+            <div id="fm-crumbs" class="fm-crumbs"></div>
+
+            <div class="fm-head">
+              <input id="fm-check-all" type="checkbox" title="全选" />
+              <span class="fm-name-col">名称</span>
+              <span class="fm-meta-col">大小</span>
+              <span class="fm-meta-col fm-time-col">修改时间</span>
             </div>
-            <input id="file-input" type="file" hidden />
+            <div id="fm-list" class="fm-list" role="listbox"></div>
+
+            <div class="fm-ops">
+              <button id="fm-upload-files" class="btn btn-sm" type="button" disabled>上传文件</button>
+              <button id="fm-upload-dir" class="btn btn-sm" type="button" disabled>上传文件夹</button>
+              <button id="fm-mkdir" class="btn btn-sm" type="button" disabled>新建目录</button>
+              <span class="fm-spacer"></span>
+              <button id="fm-download" class="btn btn-sm" type="button" disabled>下载选中</button>
+              <button id="fm-rename" class="btn btn-sm" type="button" disabled>改名</button>
+              <button id="fm-chmod" class="btn btn-sm" type="button" disabled>权限</button>
+              <button id="fm-delete" class="btn btn-sm btn-danger" type="button" disabled>删除</button>
+            </div>
+            <p class="hint">单击选中 · 双击进入目录 / 下载文件 · 可拖拽文件或文件夹到此处上传</p>
+
+            <input id="file-input" type="file" multiple hidden />
+            <input id="dir-input" type="file" webkitdirectory hidden />
             <div id="file-progress" class="progress"><div class="progress-bar"></div></div>
             <div id="file-progress-text" class="file-progress-text"></div>
             <div id="file-log" class="file-log"></div>

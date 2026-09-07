@@ -1,6 +1,6 @@
 {
   "name": "web-adb-tool",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Web-based ADB tool (WebUSB) for Allwinner/Rockchip Linux boards",
@@ -15,7 +15,8 @@
     "@xterm/xterm": "^6.0.0",
     "@yume-chan/adb": "^2.6.4",
     "@yume-chan/adb-credential-web": "^2.1.0",
-    "@yume-chan/adb-daemon-webusb": "^2.3.2"
+    "@yume-chan/adb-daemon-webusb": "^2.3.2",
+    "jszip": "^3.10.1"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
