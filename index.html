@@ -12,7 +12,7 @@
       <header class="app-header">
         <div class="brand">
           <span class="brand-name">web-adb-tool</span>
-          <span class="badge badge-version">v0.1.0</span>
+          <span class="badge badge-version">v0.2.0</span>
         </div>
         <div class="header-actions">
           <div id="conn-status" class="status">
@@ -33,20 +33,11 @@
         </aside>
 
         <section class="panel panel-shell">
-          <h2 class="panel-title">Shell</h2>
-          <div id="shell-output" class="shell-output" aria-live="polite"></div>
-          <form id="shell-form" class="shell-input-row">
-            <input
-              id="shell-input"
-              class="shell-input"
-              type="text"
-              placeholder="输入命令，回车执行，例如：ls -la"
-              autocomplete="off"
-              spellcheck="false"
-              disabled
-            />
-            <button type="submit" class="btn btn-primary" disabled>执行</button>
-          </form>
+          <h2 class="panel-title">
+            <span>Shell 终端</span>
+            <button id="btn-shell-new" class="btn btn-ghost" type="button" disabled>新终端</button>
+          </h2>
+          <div id="shell-terminal" class="shell-terminal" aria-label="交互式终端"></div>
         </section>
 
         <section class="panel panel-files">

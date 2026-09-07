@@ -17,6 +17,17 @@ export interface DeviceInfo {
   buildId: string;
 }
 
+/**
+ * 交互式终端会话句柄 —— 由 openShell 创建，
+ * UI 层拿到后把键盘输入 write 进去、把窗口尺寸 resize 过去，即可获得真终端体验。
+ */
+export interface ShellSession {
+  write(data: Uint8Array): Promise<void>;
+  resize(rows: number, cols: number): Promise<void>;
+  sigint(): Promise<void>;
+  kill(): Promise<void>;
+}
+
 type StateListener = (connected: boolean) => void;
 
 export class AdbClient {
@@ -128,6 +139,53 @@ export class AdbClient {
     return null;
   }
 
+  /**
+   * 打开一个持久的交互式 PTY 会话（默认 sh），用于真终端体验。
+   * - onData：设备输出的原始字节（含 ANSI 转义序列），UI 层直接喂给终端渲染。
+   * - onExit：会话结束（进程退出 / 连接断开）时回调退出码；fallback 到 none 协议时无退出码，传 null。
+   */
+  async openShell(
+    onData: (data: Uint8Array) => void,
+    onExit: (code: number | null) => void,
+  ): Promise<ShellSession> {
+    const adb = this.requireAdb();
+    const shellProto = adb.subprocess.shellProtocol;
+
+    if (shellProto) {
+      // shell 协议：支持 resize / sigint，是完整终端体验的首选路径
+      const proc = (await shellProto.pty({
+        command: 'sh',
+        terminalType: 'xterm-256color',
+      })) as unknown as PtyLike;
+
+      const writer = proc.input.getWriter();
+      void pumpThenExit(proc, onData, onExit);
+
+      return {
+        write: (data) => writer.write(data),
+        resize: (rows, cols) => proc.resize?.(rows, cols) ?? Promise.resolve(),
+        sigint: () => proc.sigint?.() ?? Promise.resolve(),
+        kill: async () => {
+          await proc.kill?.();
+        },
+      };
+    }
+
+    // 设备不支持 shell 协议时，退回 none 协议（无 resize，退出码为 null）
+    const proc = (await adb.subprocess.noneProtocol.pty('sh')) as unknown as PtyLike;
+    const writer = proc.input.getWriter();
+    void pumpThenExit(proc, onData, onExit);
+
+    return {
+      write: (data) => writer.write(data),
+      resize: () => Promise.resolve(),
+      sigint: () => proc.sigint?.() ?? Promise.resolve(),
+      kill: async () => {
+        await proc.kill?.();
+      },
+    };
+  }
+
   /** 上传本地文件到设备（push），带进度回调 */
   async pushFile(
     file: File,
@@ -231,5 +289,45 @@ async function pump(stream: ChunkStream, onChunk: (text: string) => void): Promi
     onChunk(decoder.decode());
   } finally {
     reader.releaseLock();
+  }
+}
+
+/**
+ * @yume-chan/adb 的 PTY 进程在 shell/none 两种协议下方法略有差异（none 无 resize、退出码为 undefined），
+ * 这里用结构化类型统一承接，避免直接引用其带泛型的流类型与 DOM 类型发生冲突。
+ */
+interface PtyLike {
+  input: {
+    getWriter(): { write(data: Uint8Array): Promise<void> };
+  };
+  output: {
+    getReader(): { read(): Promise<{ value?: Uint8Array; done: boolean }>; releaseLock(): void };
+  };
+  exited: Promise<number | null>;
+  resize?(rows: number, cols: number): Promise<void>;
+  sigint?(): Promise<void>;
+  kill?(): void | Promise<void>;
+}
+
+/** 泵干设备输出（原样字节透传，供终端渲染 ANSI 转义序列），随后汇报退出码 */
+async function pumpThenExit(
+  proc: PtyLike,
+  onData: (data: Uint8Array) => void,
+  onExit: (code: number | null) => void,
+): Promise<void> {
+  const reader = proc.output.getReader();
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value && value.byteLength > 0) onData(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  try {
+    onExit(await proc.exited);
+  } catch {
+    onExit(null);
   }
 }

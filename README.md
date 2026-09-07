@@ -4,15 +4,16 @@
 
 ## 功能
 
-- 交互式 Shell —— 执行任意 `adb shell` 命令并流式回显输出
+- 真终端 Shell —— 基于 [xterm.js](https://xtermjs.org/) 的交互式终端，键盘直接输入、实时回显，支持方向键 / 历史 / Ctrl+C / 清屏，体验等同 SSH
 - 文件传输 —— `push` / `pull`，带实时进度条
 - 设备信息 —— 型号、设备名、系统版本、SDK 等
-- 主题切换 —— 内置浅色 / 深色两套皮肤
+- 主题切换 —— 内置浅色 / 深色两套皮肤，终端配色随主题联动
 
 ## 技术栈
 
 - 前端：HTML / CSS / TypeScript + [Vite](https://vite.dev/)
 - ADB 协议：[`@yume-chan/adb`](https://github.com/yume-chan/ya-webadb)（纯 JS 实现，无需 WASM）
+- 终端：[`@xterm/xterm`](https://xtermjs.org/) + `@xterm/addon-fit`
 - 传输：WebUSB（`@yume-chan/adb-daemon-webusb`）
 - 凭证：WebCrypto RSA（`@yume-chan/adb-credential-web`）
 - 部署：GitHub Pages（纯静态，无后端）
