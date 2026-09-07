@@ -161,18 +161,10 @@
   background-color: transparent !important;
 }
 
-/* ---------- 小号 / 危险按钮 ---------- */
+/* ---------- 小号按钮 ---------- */
 .btn-sm {
   padding: 3px 10px;
   font-size: 12px;
-}
-.btn-danger {
-  color: var(--danger);
-  border-color: var(--danger);
-  background: transparent;
-}
-.btn-danger:hover:not(:disabled) {
-  background: var(--bg-hover);
 }
 
 /* ---------- 文件管理器 ---------- */

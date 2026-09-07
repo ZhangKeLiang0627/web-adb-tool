@@ -1,6 +1,6 @@
 {
   "name": "web-adb-tool",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "type": "module",
   "description": "Web-based ADB tool (WebUSB) for Allwinner/Rockchip Linux boards",

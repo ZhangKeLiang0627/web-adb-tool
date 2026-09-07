@@ -1,7 +1,8 @@
 import type { AdbClient, PushItem, RemoteEntry } from '../core/adb';
 
 /**
- * 文件管理器：目录浏览（readdir）+ 多选操作台（上传/下载/新建/改名/权限/删除）+ 批量传输。
+ * 文件管理器：目录浏览（readdir）+ 多选操作台（上传/下载/新建/改名/权限）+ 批量传输。
+ * 注：删除不在 UI 提供——adbd 对非交互 shell 会话支持不全，删除请直接在 Shell 栏用 rm。
  * 与 Shell 面板共用同一个 AdbClient；断开连接时所有控件自动禁用。
  */
 
@@ -26,7 +27,6 @@ export function initFiles(client: AdbClient): void {
   const downloadBtn = document.getElementById('fm-download') as HTMLButtonElement;
   const renameBtn = document.getElementById('fm-rename') as HTMLButtonElement;
   const chmodBtn = document.getElementById('fm-chmod') as HTMLButtonElement;
-  const deleteBtn = document.getElementById('fm-delete') as HTMLButtonElement;
 
   const fileInput = document.getElementById('file-input') as HTMLInputElement;
   const dirInput = document.getElementById('dir-input') as HTMLInputElement;
@@ -53,14 +53,12 @@ export function initFiles(client: AdbClient): void {
     downloadBtn.disabled = !(busyDisabled && hasSel);
     renameBtn.disabled = !(busyDisabled && hasSel);
     chmodBtn.disabled = !(busyDisabled && hasSel);
-    deleteBtn.disabled = !(busyDisabled && hasSel);
     pathInput.disabled = !connected;
     updateOpLabels();
   }
 
   function updateOpLabels(): void {
     downloadBtn.textContent = selected.size ? `下载选中(${selected.size})` : '下载选中';
-    deleteBtn.textContent = selected.size ? `删除选中(${selected.size})` : '删除选中';
   }
 
   client.onStateChange((connected) => {
@@ -419,7 +417,7 @@ export function initFiles(client: AdbClient): void {
     return selected.size === 1 ? 'download' : `selected-${selected.size}`;
   }
 
-  // ---------- 文件操作（新建 / 改名 / 权限 / 删除） ----------
+  // ---------- 文件操作（新建 / 改名 / 权限） ----------
   async function mkdirAction(): Promise<void> {
     const name = window.prompt('新建目录名称（仅名称，不含 /）', 'newdir');
     if (!name) return;
@@ -483,24 +481,8 @@ export function initFiles(client: AdbClient): void {
     }
   }
 
-  async function deleteAction(): Promise<void> {
-    const paths = entries.filter((e) => selected.has(e.path)).map((e) => e.path);
-    if (paths.length === 0) return;
-    const hasDir = paths.some((p) => entries.find((e) => e.path === p)?.isDir);
-    const msg = hasDir
-      ? `确定删除选中的 ${paths.length} 个条目（含目录，将递归删除全部内容）？\n\n此操作不可恢复！`
-      : `确定删除选中的 ${paths.length} 个文件？`;
-    if (!window.confirm(msg)) return;
-    try {
-      await client.removeRemote(paths, hasDir);
-      log(`已删除 ${paths.length} 个条目`, 'ok');
-      void refresh();
-    } catch (e) {
-      log(`删除失败：${toChinese(e)}`, 'err');
-    }
-  }
-
   // ---------- 事件绑定 ----------
+
   function setBusy(v: boolean): void {
     busy = v;
     pathInput.disabled = !client.connected || v;
@@ -529,7 +511,6 @@ export function initFiles(client: AdbClient): void {
   downloadBtn.addEventListener('click', () => void downloadSelection());
   renameBtn.addEventListener('click', () => void renameAction());
   chmodBtn.addEventListener('click', () => void chmodAction());
-  deleteBtn.addEventListener('click', () => void deleteAction());
 
   // 拖拽上传：把文件/文件夹拖到文件面板即可传到当前目录
   for (const ev of ['dragenter', 'dragover']) {

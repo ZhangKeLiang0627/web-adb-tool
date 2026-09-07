@@ -463,17 +463,6 @@ export class AdbClient {
     await this.execArgs(['chmod', mode, path]);
   }
 
-  /** 设备端删除（recursive=true 用 rm -rf，否则 rm -f）。
-   *  选中项合成单条命令分批执行，避免逐个 open shell（部分设备 adbd 并发会话受限时
-   *  会回 "Socket open failed"）；分批上限兼顾命令行长度。 */
-  async removeRemote(paths: string[], recursive: boolean): Promise<void> {
-    const flag = recursive ? ['-rf'] : ['-f'];
-    const BATCH = 32;
-    for (let i = 0; i < paths.length; i += BATCH) {
-      await this.execArgs(['rm', ...flag, ...paths.slice(i, i + BATCH)]);
-    }
-  }
-
   /** 执行 argv 形式的 shell 命令，stderr 非空或退出码非 0 即抛错；
    *  设备端在 OPEN 阶段偶发直接回 CLOSE（Socket open failed），退避后自动重试一次 */
   private async execArgs(args: string[]): Promise<void> {
